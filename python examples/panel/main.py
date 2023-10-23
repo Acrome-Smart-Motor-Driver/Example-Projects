@@ -1,77 +1,109 @@
-from smd.red import *
-import time
+from smd.red import*
 
-
-colorss = [Colors.RED, Colors.BLUE, Colors.CYAN, Colors.MAGENTA, Colors.WHITE]
-
-RED1 = 1
-RED2 = 2
-
-port = "COM10"
+port = "/dev/ttyUSB0"
 m = Master(port)
 
-m.attach(Red(RED1))
-m.attach(Red(RED2))
+m.attach(Red(1))
+m.attach(Red(2))
 
-m.set_operation_mode(RED1, OperationMode.PWM)
-m.set_operation_mode(RED2, OperationMode.Position)
+m.set_shaft_cpr(1, 4741)
+m.set_shaft_cpr(2, 4741)
+m.set_shaft_rpm(1, 100)
+m.set_shaft_rpm(2, 100)
 
-m.set_shaft_cpr(RED1, 4741)
-m.set_shaft_cpr(RED2, 4741)
-m.set_shaft_rpm(RED1, 100)
-m.set_shaft_rpm(RED2, 100)
+m.set_operation_mode(1, OperationMode.PWM)
+m.set_operation_mode(2, OperationMode.PWM)
 
-"""
-m.pid_tuner(RED1)
-m.pid_tuner(RED2)
-time.sleep(30)
-"""
-rgb_cnt = 0
-rgb_index = 0
-velocity_sp = 0
+print(m.scan_modules(1))
+print(m.scan_modules(2))
 
+
+
+
+CONTROL_MODE = 0
+TUNE_MODE = 1
+
+rgb_color = 0
+rgb_cntr = 0
+colors = [Colors.WHITE , Colors.BLUE]
+
+mode = 0
+
+torque = False
+m.set_rgb(1, Index.RGB_1, colors[rgb_color])
 while True:
-    """reading modules"""
-    distance = m.get_distance(RED2 , Index.Distance_1)
-    button = m.get_button(RED2, Index.Button_3)
-    light = m.get_light(RED1, Index.Light_1)
-    joystick = m.get_joystick(RED2, Index.Joystick_1)
+    
+    light = m.get_light(1, Index.Light_1)
+    button = m.get_button(1, Index.Button_1)
+    
+    distance = m.get_distance(2, Index.Distance_1)
+    joystick = m.get_joystick(2, Index.Joystick_1)
+    IMU = m.get_imu(2, Index.IMU_1)
     
     
-    if (light < 50):
-        rgb_cnt +=1
-    if rgb_cnt > 5:
-        rgb_index +=1
-        rgb_cnt = 0
-    if rgb_index > 4:
-        rgb_index = 0
-
-    #Table
-    #print(distance)
-    #print(joystick[1])
-
-    m.set_rgb(RED1, Index.RGB_1  ,colorss[rgb_index])
-
-    """
-    print(button)
-    print(light)
-    """
-    if button == 1:
-        torque = True
+    
+    #rgb change
+    if light < 30:
+        rgb_cntr += 1
     else:
-        torque = False
+        rgb_cntr = 0
+    if rgb_cntr > 5:
+        rgb_cntr = 0
+        rgb_color +=1
+        if rgb_color > 1:
+            rgb_color = 0
+        m.set_rgb(1, Index.RGB_1, colors[rgb_color])
+        time.sleep(0.25)
+        
+    #mode change
+    if button == 1:
+        mode = rgb_color
     
-    m.enable_torque(RED1, torque)
-    m.enable_torque(RED2, torque)
-
-
-    velocity_sp = joystick[1]*100 -50
-    print(velocity_sp)
-
-    # Control
-    m.set_position(RED2, distance*20)
-    m.set_duty_cycle(RED1, int(velocity_sp))
-
-    #time.sleep(0.5)
-
-    #m.set_position(RED1, )
+    
+    
+    if mode == TUNE_MODE:
+        m.pid_tuner(1)
+        m.pid_tuner(2)
+        
+        time.sleep(27)
+        mode = CONTROL_MODE
+        
+        rgb_color = 0
+        m.set_rgb(1, Index.RGB_1, Colors.WHITE)
+        
+        
+    if mode == CONTROL_MODE:
+        if button == 1:
+            if torque:
+                torque = False
+            else:
+                torque = True
+            m.enable_torque(1, torque)
+            m.enable_torque(2, torque)
+            time.sleep(0.25)
+            
+        m.enable_torque(1, torque)
+        m.enable_torque(2, torque)
+        
+        
+        pwm1 = joystick[0]*100 - 50
+        pwm2 = joystick[1]*100 - 50
+        if(joystick[0] < 0.60 and joystick[0] > 0.39):
+            pwm1 = 0
+        if(joystick[1] < 0.60 and joystick[1] > 0.39):
+            pwm2 = 0
+            
+        pwm1 += IMU[0]
+        pwm2 += IMU[1]
+        
+        if distance < 20:
+            m.enable_torque(1, False)
+            m.enable_torque(2, False)
+            pwm1 = 0
+            pwm2 = 0
+        
+        m.set_duty_cycle(1, pwm1)
+        m.set_duty_cycle(2, pwm2)
+        
+        
+    print(str(light) + "\t" + str(button) + "\t" + str(joystick))
