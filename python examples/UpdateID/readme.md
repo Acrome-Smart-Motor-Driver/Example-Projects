@@ -1,0 +1,1 @@
+This code allows changing the ID of the card with the smallest ID among connected SMD's.
