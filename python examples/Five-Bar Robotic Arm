@@ -1,0 +1,38 @@
+from smd.smd_types import Index
+from smd.smd import Master
+import time
+import math
+from 5bar_InvKin import *
+   
+if __name__ == "__main__":
+    # End effector coordinates
+    # x, y = float(sys.argv[1]), float(sys.argv[2])
+    # s1, s2 = calc_angles(x, y)
+    m = Master(4096, 'COM16')   #Change the COM port number as needed
+    print(m.AutoScan())
+    m.send(m.SyncWrite(Index.OperationMode, id_val_pairs=[[0, 0], [1, 0]]))
+    time.sleep(0.3)
+
+    m.send(m.SyncWrite(Index.TorqueEnable, id_val_pairs=[[0, 1], [1, 1]]))
+    time.sleep(0.3)
+
+    m.send(m.SyncWrite(Index.MotorCPR, id_val_pairs=[[0, 6533], [1, 6533]]))
+    time.sleep(0.3)
+
+    m.send(m.SyncWrite(Index.MotorRPM, id_val_pairs=[[0, 100], [1, 100]]))
+    time.sleep(0.3)
+
+    m.send(m.SyncWrite(Index.PosPGain, id_val_pairs=[[0, 3.4056], [1, 10.3439]]))  # değişecek
+    time.sleep(0.3)
+     
+    m.send(m.SyncWrite(Index.PosDGain, id_val_pairs=[[0, 6.4178], [1, 23.2778]])) # değişecek
+    time.sleep(0.3)
+ 
+    m.send(m.SyncWrite(Index.MinimumPosition, id_val_pairs=[[0, -5000], [1, -5000]]))
+    time.sleep(0.3)
+    i=0
+    while True:
+        i=i+1
+        x=math.cos(math.radians(i))*4
+        y=math.sin(math.radians(i))*4
+        plot_plot(x, y+27,m)
